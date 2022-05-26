@@ -2,6 +2,7 @@ authlib>=1.0
 Flask>=2.0.3
 flask-cors
 google-cloud-datastore==2.1.6
+protobuf~=3.19.0
 python-dotenv>=0.19.2
 python-jose
 requests>=2.27.1
