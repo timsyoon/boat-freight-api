@@ -14,14 +14,14 @@ from six.moves.urllib.parse import urlencode, quote_plus
 from six.moves.urllib.request import urlopen
 from werkzeug.exceptions import HTTPException
 
-CLIENT_ID = 'CvfmWjXj8iAcTrxXSVntcyuIlA9W1I6t'
-CLIENT_SECRET = 'c8ouYrnKZmbZ8J9ruR8A4wf-ToRnRbjJ8_IJZdZCKAkaXt_YrFkal6SpIxzJ8AV4'
-DOMAIN = 'cs493-yoonti.us.auth0.com'
+CLIENT_ID = '550PTu8Z9Cs3NxE9iJoCUw7ACKIf5nXR'
+CLIENT_SECRET = 'YqlvzT8SUrRxd9qDgRfj9uox3TABZXX_iCOxrkD-zlVzxM7EalEWMQjE1hG_z4vn'
+DOMAIN = 'cs493-spring22-yoonti.us.auth0.com'
 ALGORITHMS = ["RS256"]
 BOATS = "boats"
 
 app = Flask(__name__)
-app.secret_key = '13241d3a74659e7f63e36362aa26576af2c573cdd391dd2334e1c10a7b1a762d'
+app.secret_key = 'SECRET_KEY'
 
 oauth = OAuth(app)
 
