@@ -8,6 +8,8 @@
         <h1>User Info</h1>
         <h2>JWT Issued by Auth0:</h2>
         <p>{{ id_token }}</p>
+        <h2>User ID:</h2>
+        <p>{{ sub }}</p>
         <form action="{{ url_for('logout') }}" method="get">
             <input type="submit" value="Log Out">
         </form>

@@ -130,13 +130,16 @@ def login():
 def callback():
     token = oauth.auth0.authorize_access_token()
     id_token = token['id_token']
+    sub = token['userinfo']['sub']
     session['id_token'] = id_token
+    session['sub'] = sub
     return redirect(url_for('user_info'))
 
 @app.route('/user-info', methods=['GET'])
 def user_info():
     id_token = session['id_token']
-    return render_template('userInfo.html', id_token=id_token)
+    sub = session['sub']
+    return render_template('userInfo.html', id_token=id_token, sub=sub)
 
 @app.route("/logout")
 def logout():
