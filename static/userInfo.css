@@ -1,0 +1,10 @@
+body {
+    text-align: center;
+}
+
+p {
+    margin-left: 300px;
+    margin-right: 300px;
+    margin-bottom: 30px;
+    word-wrap: break-word;
+}

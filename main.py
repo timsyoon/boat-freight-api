@@ -1,0 +1,265 @@
+import json
+import requests
+import urllib.parse
+
+from authlib.integrations.flask_client import OAuth
+from dotenv import find_dotenv, load_dotenv
+from flask import Flask, request, jsonify, _request_ctx_stack, redirect, render_template, session, url_for
+from flask_cors import cross_origin
+from functools import wraps
+from google.cloud import datastore
+from jose import jwt
+from os import environ as env
+from six.moves.urllib.parse import urlencode, quote_plus
+from six.moves.urllib.request import urlopen
+from werkzeug.exceptions import HTTPException
+
+CLIENT_ID = 'CvfmWjXj8iAcTrxXSVntcyuIlA9W1I6t'
+CLIENT_SECRET = 'c8ouYrnKZmbZ8J9ruR8A4wf-ToRnRbjJ8_IJZdZCKAkaXt_YrFkal6SpIxzJ8AV4'
+DOMAIN = 'cs493-yoonti.us.auth0.com'
+ALGORITHMS = ["RS256"]
+BOATS = "boats"
+
+app = Flask(__name__)
+app.secret_key = '13241d3a74659e7f63e36362aa26576af2c573cdd391dd2334e1c10a7b1a762d'
+
+oauth = OAuth(app)
+
+auth0 = oauth.register(
+    'auth0',
+    client_id=CLIENT_ID,
+    client_secret=CLIENT_SECRET,
+    api_base_url="https://" + DOMAIN,
+    access_token_url="https://" + DOMAIN + "/oauth/token",
+    authorize_url="https://" + DOMAIN + "/authorize",
+    client_kwargs={
+        'scope': 'openid profile email',
+    },
+    server_metadata_url='https://' + DOMAIN + '/.well-known/openid-configuration'
+)
+
+client = datastore.Client()
+
+# This code is adapted from https://auth0.com/docs/quickstart/backend/python/01-authorization?_ga=2.46956069.349333901.1589042886-466012638.1589042885#create-the-jwt-validation-decorator
+
+class AuthError(Exception):
+    def __init__(self, error, status_code):
+        self.error = error
+        self.status_code = status_code
+
+@app.errorhandler(AuthError)
+def handle_auth_error(ex):
+    response = jsonify(ex.error)
+    response.status_code = ex.status_code
+    return response
+
+# Verify the JWT in the request's Authorization header
+def verify_jwt(request):
+    if 'Authorization' in request.headers:
+        auth_header = request.headers['Authorization'].split()
+        token = auth_header[1]
+    else:
+        raise AuthError({"code": "no auth header",
+                            "description":
+                                "Authorization header is missing"}, 401)
+    
+    jsonurl = urlopen("https://"+ DOMAIN+"/.well-known/jwks.json")
+    jwks = json.loads(jsonurl.read())
+    try:
+        unverified_header = jwt.get_unverified_header(token)
+    except jwt.JWTError:
+        raise AuthError({"code": "invalid_header",
+                        "description":
+                            "Invalid header. "
+                            "Use an RS256 signed JWT Access Token"}, 401)
+    if unverified_header["alg"] == "HS256":
+        raise AuthError({"code": "invalid_header",
+                        "description":
+                            "Invalid header. "
+                            "Use an RS256 signed JWT Access Token"}, 401)
+    rsa_key = {}
+    for key in jwks["keys"]:
+        if key["kid"] == unverified_header["kid"]:
+            rsa_key = {
+                "kty": key["kty"],
+                "kid": key["kid"],
+                "use": key["use"],
+                "n": key["n"],
+                "e": key["e"]
+            }
+    if rsa_key:
+        try:
+            payload = jwt.decode(
+                token,
+                rsa_key,
+                algorithms=ALGORITHMS,
+                audience=CLIENT_ID,
+                issuer="https://"+ DOMAIN+"/"
+            )
+        except jwt.ExpiredSignatureError:
+            raise AuthError({"code": "token_expired",
+                            "description": "token is expired"}, 401)
+        except jwt.JWTClaimsError:
+            raise AuthError({"code": "invalid_claims",
+                            "description":
+                                "incorrect claims,"
+                                " please check the audience and issuer"}, 401)
+        except Exception:
+            raise AuthError({"code": "invalid_header",
+                            "description":
+                                "Unable to parse authentication"
+                                " token."}, 401)
+
+        return payload
+    else:
+        raise AuthError({"code": "no_rsa_key",
+                            "description":
+                                "No RSA key in JWKS"}, 401)
+
+@app.route("/")
+def home():
+    return render_template("home.html")
+
+@app.route('/login', methods=['POST'])
+def login():
+    return oauth.auth0.authorize_redirect(
+        redirect_uri=url_for("callback", _external=True)
+    )
+
+@app.route("/callback", methods=["GET", "POST"])
+def callback():
+    token = oauth.auth0.authorize_access_token()
+    id_token = token['id_token']
+    session['id_token'] = id_token
+    return redirect(url_for('user_info'))
+
+@app.route('/user-info', methods=['GET'])
+def user_info():
+    id_token = session['id_token']
+    return render_template('userInfo.html', id_token=id_token)
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(
+        "https://" + DOMAIN
+        + "/v2/logout?"
+        + urlencode(
+            {
+                "returnTo": url_for("home", _external=True),
+                "client_id": CLIENT_ID,
+            },
+            quote_via=quote_plus,
+        )
+    )
+
+# Decode the JWT supplied in the Authorization header
+@app.route('/decode', methods=['GET'])
+def decode_jwt():
+    payload = verify_jwt(request)
+    return payload          
+
+# Create a boat if the Authorization header contains a valid JWT
+@app.route('/boats', methods=['POST', 'GET'])
+def boats_post():
+    if request.method == 'POST':
+        payload = verify_jwt(request)
+        content = request.get_json()
+        new_boat = datastore.entity.Entity(key=client.key(BOATS))
+        new_boat.update(
+            {
+                'name': content['name'],
+                'type': content['type'],
+                'length': content['length'],
+                'public': content['public'],
+                'owner': payload['sub']
+            }
+        )
+        client.put(new_boat)
+        return jsonify(id=new_boat.key.id), 201
+    elif request.method == 'GET':
+        try:
+            payload = verify_jwt(request)
+            sub = payload['sub']
+            query = client.query(kind=BOATS)
+            query.add_filter("owner", "=", sub)
+            results = list(query.fetch())
+            for boat in results:
+                boat['id'] = boat.key.id
+            return jsonify(results), 200
+        except AuthError:
+            print('AuthError was caught')
+            query = client.query(kind=BOATS)
+            query.add_filter("public", "=", True)
+            results = list(query.fetch())
+            for boat in results:
+                boat['id'] = boat.key.id
+            return jsonify(results), 200
+        except:
+            print('Error during JWT verification.')
+    else:
+        return jsonify(error='Method not recognized')
+
+@app.route('/owners/<owner_id>/boats', methods=['GET'])
+def boats_of_owner(owner_id):
+    decoded_owner_id = urllib.parse.unquote(owner_id)
+    
+    query = client.query(kind=BOATS)
+    query.add_filter("owner", "=", decoded_owner_id)
+    query.add_filter("public", "=", True)
+    results = list(query.fetch())
+    
+    for boat in results:
+        boat["id"] = boat.key.id
+    return jsonify(results), 200
+
+@app.route('/boats/<boat_id>', methods=['DELETE'])
+def specific_boat(boat_id):
+    if request.method == 'DELETE':
+        is_jwt_valid = False
+        jwt_sub = None
+        try:
+            payload = verify_jwt(request)
+            is_jwt_valid = True
+            jwt_sub = payload['sub']
+        except AuthError:
+            return jsonify(error='AuthError was caught.'), 401
+        except:
+            print('Error during JWT verification.')
+        
+        if is_jwt_valid:
+            boat_key = client.key(BOATS, int(boat_id))
+            boat = client.get(key=boat_key)
+            # If the boat does not exist, return 403 status code
+            if boat is None:
+                return jsonify(error='No boat with this boat_id exists.'), 403
+            # If the boat is owned by someone else, return 403 status code
+            if boat['owner'] != jwt_sub:
+                return jsonify(error='The boat belongs to someone else.'), 403
+            client.delete(boat_key)
+            res_body = {}
+            return jsonify(res_body), 204
+
+# Generate a JWT from the Auth0 domain and return it
+# Request: JSON body with 2 properties with "username" and "password"
+#       of a user registered with this Auth0 domain
+# Response: JSON with the JWT as the value of the property id_token
+@app.route('/manual-login', methods=['POST'])
+def manual_login_user():
+    content = request.get_json()
+    username = content["username"]
+    password = content["password"]
+    body = {
+        'grant_type': 'password',
+        'username': username,
+        'password': password,
+        'client_id': CLIENT_ID,
+        'client_secret': CLIENT_SECRET
+    }
+    headers = { 'content-type': 'application/json' }
+    url = 'https://' + DOMAIN + '/oauth/token'
+    r = requests.post(url, json=body, headers=headers)
+    return r.text, 200, {'Content-Type':'application/json'}
+
+if __name__ == '__main__':
+    app.run(host='127.0.0.1', port=8080, debug=True)
