@@ -18,7 +18,8 @@ CLIENT_ID = '550PTu8Z9Cs3NxE9iJoCUw7ACKIf5nXR'
 CLIENT_SECRET = 'YqlvzT8SUrRxd9qDgRfj9uox3TABZXX_iCOxrkD-zlVzxM7EalEWMQjE1hG_z4vn'
 DOMAIN = 'cs493-spring22-yoonti.us.auth0.com'
 ALGORITHMS = ["RS256"]
-BOATS = "boats"
+BOATS = 'boats'
+LOADS = 'loads'
 
 app = Flask(__name__)
 app.secret_key = 'SECRET_KEY'
@@ -164,17 +165,27 @@ def decode_jwt():
 
 # Create a boat if the Authorization header contains a valid JWT
 @app.route('/boats', methods=['POST', 'GET'])
-def boats_post():
+def boats():
     if request.method == 'POST':
         payload = verify_jwt(request)
         content = request.get_json()
+        # If the request is missing any of the required attributes
+        if (not 'name' in content
+        or not 'type' in content
+        or not 'length' in content
+        or not 'owner' in content):
+            res_body = {
+                'Error': 'The request object is missing at least one of the required attributes'
+            }
+            return jsonify(res_body), 400
+        # If the request's Accept header does not include 'application/json'
+        # todo
         new_boat = datastore.entity.Entity(key=client.key(BOATS))
         new_boat.update(
             {
                 'name': content['name'],
                 'type': content['type'],
                 'length': content['length'],
-                'public': content['public'],
                 'owner': payload['sub']
             }
         )
