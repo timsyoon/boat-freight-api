@@ -20,6 +20,7 @@ DOMAIN = 'cs493-spring22-yoonti.us.auth0.com'
 ALGORITHMS = ["RS256"]
 BOATS = 'boats'
 LOADS = 'loads'
+APP_URL = 'http://localhost:8080'
 
 app = Flask(__name__)
 app.secret_key = 'SECRET_KEY'
@@ -167,8 +168,8 @@ def decode_jwt():
 @app.route('/boats', methods=['POST', 'GET'])
 def boats():
     if request.method == 'POST':
-        payload = verify_jwt(request)
         content = request.get_json()
+        
         # If the request is missing any of the required attributes
         if (not 'name' in content
         or not 'type' in content
@@ -178,19 +179,52 @@ def boats():
                 'Error': 'The request object is missing at least one of the required attributes'
             }
             return jsonify(res_body), 400
-        # If the request's Accept header does not include 'application/json'
-        # todo
-        new_boat = datastore.entity.Entity(key=client.key(BOATS))
-        new_boat.update(
-            {
+        
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+        
+        is_jwt_valid = False
+        payload = None
+        try:
+            payload = verify_jwt(request)
+            is_jwt_valid = True
+        except AuthError:
+            res_body = {
+                'Error': 'The request object has a missing or invalid JWT'
+            }
+            return jsonify(res_body), 401
+        except:
+            res_body = {
+                'Error': 'There was an error during JWT verification'
+            }
+            return jsonify(res_body), 401
+        
+        if is_jwt_valid:
+            # Add a new boat to the database
+            new_boat = datastore.entity.Entity(key=client.key(BOATS))
+            new_boat.update(
+                {
+                    'name': content['name'],
+                    'type': content['type'],
+                    'length': content['length'],
+                    'owner': payload['sub']
+                }
+            )
+            client.put(new_boat)
+            res_body = {
+                'id': new_boat.key.id,
                 'name': content['name'],
                 'type': content['type'],
                 'length': content['length'],
-                'owner': payload['sub']
+                'owner': payload['sub'],
+                'loads': [],
+                'self': '{}/boats/{}'.format(APP_URL, new_boat.key.id)
             }
-        )
-        client.put(new_boat)
-        return jsonify(id=new_boat.key.id), 201
+            return jsonify(res_body), 201
     elif request.method == 'GET':
         try:
             payload = verify_jwt(request)
