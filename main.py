@@ -164,10 +164,11 @@ def decode_jwt():
     payload = verify_jwt(request)
     return payload          
 
-# Create a boat if the Authorization header contains a valid JWT
 @app.route('/boats', methods=['POST', 'GET'])
 def boats():
     if request.method == 'POST':
+        # Create a boat if the Authorization header contains a valid JWT
+
         content = request.get_json()
         
         # If the request is missing any of the required attributes
@@ -226,26 +227,55 @@ def boats():
                 'self': '{}/boats/{}'.format(APP_URL, new_boat.key.id)
             }
             return jsonify(res_body), 201
+
     elif request.method == 'GET':
+
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+
+        is_jwt_valid = False
+        payload = None
         try:
             payload = verify_jwt(request)
+            is_jwt_valid = True
+        except AuthError:
+            res_body = {
+                'Error': 'The request object has a missing or invalid JWT'
+            }
+            return jsonify(res_body), 401
+        except:
+            res_body = {
+                'Error': 'There was an error during JWT verification'
+            }
+            return jsonify(res_body), 401
+        
+        if is_jwt_valid:
             sub = payload['sub']
+            q_limit = int(request.args.get('limit', '5'))
+            q_offset = int(request.args.get('offset', '0'))
+            
             query = client.query(kind=BOATS)
             query.add_filter("owner", "=", sub)
-            results = list(query.fetch())
-            for boat in results:
-                boat['id'] = boat.key.id
-            return jsonify(results), 200
-        except AuthError:
-            print('AuthError was caught')
-            query = client.query(kind=BOATS)
-            query.add_filter("public", "=", True)
-            results = list(query.fetch())
-            for boat in results:
-                boat['id'] = boat.key.id
-            return jsonify(results), 200
-        except:
-            print('Error during JWT verification.')
+            query_iterator = query.fetch(limit=q_limit, offset=q_offset)
+            pages = query_iterator.pages
+            results = list(next(pages))
+            if query_iterator.next_page_token:
+                next_offset = q_offset + q_limit
+                next_url = request.base_url + "?limit=" + str(q_limit) + "&offset=" + str(next_offset)
+            else:
+                next_url = None
+            for e in results:
+                e["id"] = e.key.id
+                e["self"] = "{}/{}".format(request.base_url, e.key.id)
+            output = {"boats": results}
+            if next_url:
+                output["next"] = next_url
+            return jsonify(output), 200
+
     else:
         return jsonify(error='Method not recognized')
 
