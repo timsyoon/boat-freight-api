@@ -174,8 +174,7 @@ def boats():
         # If the request is missing any of the required attributes
         if (not 'name' in content
         or not 'type' in content
-        or not 'length' in content
-        or not 'owner' in content):
+        or not 'length' in content):
             res_body = {
                 'Error': 'The request object is missing at least one of the required attributes'
             }
