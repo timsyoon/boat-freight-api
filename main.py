@@ -211,7 +211,8 @@ def boats():
                     'name': content['name'],
                     'type': content['type'],
                     'length': content['length'],
-                    'owner': payload['sub']
+                    'owner': payload['sub'],
+                    'loads': []
                 }
             )
             client.put(new_boat)
