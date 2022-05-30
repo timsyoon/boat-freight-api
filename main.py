@@ -20,6 +20,7 @@ DOMAIN = 'cs493-spring22-yoonti.us.auth0.com'
 ALGORITHMS = ["RS256"]
 BOATS = 'boats'
 LOADS = 'loads'
+USERS = 'users'
 APP_URL = 'http://localhost:8080'
 
 app = Flask(__name__)
@@ -135,6 +136,20 @@ def callback():
     sub = token['userinfo']['sub']
     session['id_token'] = id_token
     session['sub'] = sub
+    # If the user entity does not exist in the database, add a new user entity
+    query = client.query(kind=USERS)
+    query.add_filter('user_id', '=', sub)
+    results = list(query.fetch())
+    if len(results) == 0:
+        new_user = datastore.entity.Entity(key=client.key(USERS))
+        new_user.update(
+            {
+                'user_id': sub,
+                'boats': []
+            }
+        )
+        client.put(new_user)
+
     return redirect(url_for('user_info'))
 
 @app.route('/user-info', methods=['GET'])
