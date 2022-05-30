@@ -291,9 +291,55 @@ def boats_of_owner(owner_id):
         boat["id"] = boat.key.id
     return jsonify(results), 200
 
-@app.route('/boats/<boat_id>', methods=['DELETE'])
+@app.route('/boats/<boat_id>', methods=['GET', 'DELETE'])
 def specific_boat(boat_id):
-    if request.method == 'DELETE':
+    
+    if request.method == "GET":
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+        
+        is_jwt_valid = False
+        payload = None
+        try:
+            payload = verify_jwt(request)
+            is_jwt_valid = True
+            jwt_sub = payload['sub']
+        except AuthError:
+            res_body = {
+                'Error': 'The request object has a missing or invalid JWT'
+            }
+            return jsonify(res_body), 401
+        except:
+            res_body = {
+                'Error': 'There was an error during JWT verification'
+            }
+            return jsonify(res_body), 401
+
+        if is_jwt_valid:
+            boat_key = client.key(BOATS, int(boat_id))
+            boat = client.get(key=boat_key)
+            # If the boat belongs to someone else
+            if boat['owner'] != jwt_sub:
+                res_body = {
+                    "Error": "The boat belongs to someone else"
+                }
+                return jsonify(res_body), 403
+            res_body = {
+                "id": boat.key.id,
+                "name": boat["name"],
+                "type": boat["type"],
+                "length": boat["length"],
+                "owner": boat["owner"],
+                "loads": boat["loads"],
+                "self": request.base_url
+            }
+            return jsonify(res_body), 200
+
+    elif request.method == 'DELETE':
         is_jwt_valid = False
         jwt_sub = None
         try:
