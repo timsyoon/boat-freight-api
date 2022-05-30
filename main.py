@@ -119,6 +119,12 @@ def verify_jwt(request):
                             "description":
                                 "No RSA key in JWKS"}, 401)
 
+# Decode the JWT supplied in the Authorization header
+@app.route('/decode', methods=['GET'])
+def decode_jwt():
+    payload = verify_jwt(request)
+    return payload
+
 @app.route("/")
 def home():
     return render_template("home.html")
@@ -173,11 +179,20 @@ def logout():
         )
     )
 
-# Decode the JWT supplied in the Authorization header
-@app.route('/decode', methods=['GET'])
-def decode_jwt():
-    payload = verify_jwt(request)
-    return payload          
+@app.route('/users', methods=['GET'])
+def users():
+    if request.method == 'GET':
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+        
+        # Get all the users in the database
+        query = client.query(kind=USERS)
+        results = list(query.fetch())
+        return jsonify(results), 200
 
 @app.route('/boats', methods=['POST', 'GET'])
 def boats():
