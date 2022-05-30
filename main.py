@@ -231,6 +231,21 @@ def boats():
                 }
             )
             client.put(new_boat)
+            
+            # Update the associated user entity's 'boats' property
+            query = client.query(kind=USERS)
+            query.add_filter('user_id', '=', payload['sub'])
+            results = list(query.fetch())
+            for user in results:
+                user['boats'].append(new_boat.key.id)
+                user.update(
+                    {
+                        'user_id': payload['sub'],
+                        'boats': user['boats']
+                    }
+                )
+                client.put(user)
+
             res_body = {
                 'id': new_boat.key.id,
                 'name': content['name'],
