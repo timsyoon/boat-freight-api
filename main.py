@@ -318,6 +318,15 @@ def boats():
             output = {"boats": results}
             if next_url:
                 output["next"] = next_url
+            
+            # Get total number of boats (owned by the user) in the collection
+            second_query = client.query(kind=BOATS)
+            second_query.add_filter("owner", "=", sub)
+            second_query.keys_only()
+            results = list(query.fetch())
+            total_number_of_boats = len(results)
+            output["total_number_of_boats"] = total_number_of_boats
+
             return jsonify(output), 200
 
     else:
