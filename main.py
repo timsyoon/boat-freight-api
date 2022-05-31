@@ -519,7 +519,7 @@ def specific_boat(boat_id):
             res_body = {}
             return jsonify(res_body), 204
 
-@app.route('/loads', methods=['POST'])
+@app.route('/loads', methods=['POST', 'GET'])
 def loads():
     if request.method == "POST":
         content = request.get_json()
@@ -557,6 +557,43 @@ def loads():
             "self": "{}/{}".format(request.base_url, new_load.key.id)
         }
         return jsonify(res_body), 201
+    
+    elif request.method == 'GET':
+
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+        
+        q_limit = int(request.args.get('limit', '5'))
+        q_offset = int(request.args.get('offset', '0'))
+        
+        query = client.query(kind=LOADS)
+        query_iterator = query.fetch(limit=q_limit, offset=q_offset)
+        pages = query_iterator.pages
+        results = list(next(pages))
+        if query_iterator.next_page_token:
+            next_offset = q_offset + q_limit
+            next_url = request.base_url + "?limit=" + str(q_limit) + "&offset=" + str(next_offset)
+        else:
+            next_url = None
+        for e in results:
+            e["id"] = e.key.id
+            e["self"] = "{}/{}".format(request.base_url, e.key.id)
+        output = {"loads": results}
+        if next_url:
+            output["next"] = next_url
+        
+        # Get total number of loads in the collection
+        second_query = client.query(kind=LOADS)
+        second_query.keys_only()
+        results = list(query.fetch())
+        total_number_of_loads = len(results)
+        output["total_number_of_loads"] = total_number_of_loads
+
+        return jsonify(output), 200
 
 # Generate a JWT from the Auth0 domain and return it
 # Request: JSON body with 2 properties with "username" and "password"
