@@ -498,19 +498,27 @@ def specific_boat(boat_id):
             is_jwt_valid = True
             jwt_sub = payload['sub']
         except AuthError:
-            return jsonify(error='AuthError was caught.'), 401
+            res_body = {
+                'Error': 'The request object has a missing or invalid JWT'
+            }
+            return jsonify(res_body), 401
         except:
-            print('Error during JWT verification.')
+            res_body = {
+                'Error': 'There was an error during JWT verification'
+            }
+            return jsonify(res_body), 401
         
         if is_jwt_valid:
             boat_key = client.key(BOATS, int(boat_id))
             boat = client.get(key=boat_key)
-            # If the boat does not exist, return 403 status code
-            if boat is None:
-                return jsonify(error='No boat with this boat_id exists.'), 403
+
             # If the boat is owned by someone else, return 403 status code
             if boat['owner'] != jwt_sub:
-                return jsonify(error='The boat belongs to someone else.'), 403
+                res_body = {
+                    "Error": "The boat belongs to someone else"
+                }
+                return jsonify(res_body), 403
+            
             client.delete(boat_key)
             res_body = {}
             return jsonify(res_body), 204
