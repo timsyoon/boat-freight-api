@@ -323,19 +323,6 @@ def boats():
     else:
         return jsonify(error='Method not recognized')
 
-@app.route('/owners/<owner_id>/boats', methods=['GET'])
-def boats_of_owner(owner_id):
-    decoded_owner_id = urllib.parse.unquote(owner_id)
-    
-    query = client.query(kind=BOATS)
-    query.add_filter("owner", "=", decoded_owner_id)
-    query.add_filter("public", "=", True)
-    results = list(query.fetch())
-    
-    for boat in results:
-        boat["id"] = boat.key.id
-    return jsonify(results), 200
-
 @app.route('/boats/<boat_id>', methods=['GET', 'PATCH', 'PUT', 'DELETE'])
 def specific_boat(boat_id):
 
@@ -522,6 +509,45 @@ def specific_boat(boat_id):
             client.delete(boat_key)
             res_body = {}
             return jsonify(res_body), 204
+
+@app.route('/loads', methods=['POST'])
+def loads():
+    if request.method == "POST":
+        content = request.get_json()
+        
+        # If the request is missing any of the required attributes
+        if (not "volume" in content) or (not "item" in content) or (not "creation_date" in content):
+            res_body = {
+                "Error": "The request object is missing at least one of the required attributes"
+            }
+            return jsonify(res_body), 400
+
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+
+        new_load = datastore.entity.Entity(key=client.key(LOADS))
+        new_load.update(
+            {
+                "volume": content["volume"],
+                "item": content["item"],
+                "creation_date": content["creation_date"],
+                "carrier": None
+            }
+        )
+        client.put(new_load)
+        res_body = {
+            "id": new_load.key.id,
+            "volume": new_load["volume"],
+            "item": new_load["item"],
+            "creation_date": new_load["creation_date"],
+            "carrier": new_load["carrier"],
+            "self": "{}/{}".format(request.base_url, new_load.key.id)
+        }
+        return jsonify(res_body), 201
 
 # Generate a JWT from the Auth0 domain and return it
 # Request: JSON body with 2 properties with "username" and "password"
