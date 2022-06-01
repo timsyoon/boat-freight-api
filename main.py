@@ -142,7 +142,8 @@ def callback():
     sub = token['userinfo']['sub']
     session['id_token'] = id_token
     session['sub'] = sub
-    # If the user entity does not exist in the database, add a new user entity
+
+    # If the user does not exist in the database, add a new user entity
     query = client.query(kind=USERS)
     query.add_filter('user_id', '=', sub)
     results = list(query.fetch())
@@ -197,8 +198,6 @@ def users():
 @app.route('/boats', methods=['POST', 'GET'])
 def boats():
     if request.method == 'POST':
-        # Create a boat if the Authorization header contains a valid JWT
-
         content = request.get_json()
         
         # If the request is missing any of the required attributes
@@ -217,6 +216,7 @@ def boats():
             }
             return jsonify(res_body), 406
         
+        # Create a boat if the Authorization header contains a valid JWT
         is_jwt_valid = False
         payload = None
         try:
@@ -248,29 +248,21 @@ def boats():
             client.put(new_boat)
             
             # Update the associated user entity's 'boats' property
+            obj_to_add = {
+                'id': new_boat.key.id,
+                'self': '{}/boats/{}'.format(APP_URL, new_boat.key.id)
+            }
             query = client.query(kind=USERS)
             query.add_filter('user_id', '=', payload['sub'])
             results = list(query.fetch())
             for user in results:
-                user['boats'].append(new_boat.key.id)
-                user.update(
-                    {
-                        'user_id': payload['sub'],
-                        'boats': user['boats']
-                    }
-                )
+                user['boats'].append(obj_to_add)
                 client.put(user)
 
-            res_body = {
-                'id': new_boat.key.id,
-                'name': content['name'],
-                'type': content['type'],
-                'length': content['length'],
-                'owner': payload['sub'],
-                'loads': [],
-                'self': '{}/boats/{}'.format(APP_URL, new_boat.key.id)
-            }
-            return jsonify(res_body), 201
+            new_boat['id'] = new_boat.key.id
+            new_boat['self'] = '{}/boats/{}'.format(APP_URL, new_boat.key.id)
+
+            return jsonify(new_boat), 201
 
     elif request.method == 'GET':
 
