@@ -681,7 +681,7 @@ def specific_load(load_id):
 
         return ("", 204)
 
-@app.route('/boats/<boat_id>/loads/<load_id>')
+@app.route('/boats/<boat_id>/loads/<load_id>', methods=['PUT'])
 def boats_loads(boat_id, load_id):
     if request.method == "PUT":
         boat_key = client.key(BOATS, int(boat_id))
@@ -689,46 +689,36 @@ def boats_loads(boat_id, load_id):
         boat = client.get(key=boat_key)
         load = client.get(key=load_key)
         
-        # If the load has already been assigned to another boat
-        if load["carrier"] is not None:
-            res_body = {"Error": "The load is already loaded on another boat"}
-            return (jsonify(res_body), 403)
+        # Check whether both the boat and load exist
+        if boat is None or load is None:
+            res_body = { "Error": "The specified boat and/or load does not exist" }
+            return jsonify(res_body), 404
+
         # Add the load to the boat's loads only if the boat does not have that load
         does_boat_have_load = False
-        current_loads = boat["loads"]
-        for load_obj in current_loads:
+        
+        for load_obj in boat["loads"]:
             if load_obj["id"] == load.key.id:
                 does_boat_have_load = True
+        
         if not does_boat_have_load:
+            # Update the boat
             new_load_obj = {
                 "id": load.key.id,
                 "self": request.host_url + "loads/{}".format(load.key.id)
             }
-            current_loads.append(new_load_obj)
-        boat.update(
-            {
-                "name": boat["name"],
-                "type": boat["type"],
-                "length": boat["length"],
-                "loads": current_loads
+            boat["loads"].append(new_load_obj)
+            client.put(boat)
+
+            # Update the load
+            carrier_obj = {
+                "id": boat.key.id,
+                "self": request.host_url + "boats/{}".format(boat.key.id)
             }
-        )
-        client.put(boat)
-        # Update the carrier on the load
-        carrier_obj = {
-            "id": boat.key.id,
-            "self": request.host_url + "boats/{}".format(boat.key.id)
-        }
-        load.update(
-            {
-                "volume": load["volume"],
-                "item": load["item"],
-                "creation_date": load["creation_date"],
-                "carrier": carrier_obj
-            }
-        )
-        client.put(load)
-        return ("", 204)
+            load["carrier"] = carrier_obj
+            client.put(load)
+
+            return jsonify({}), 204
 
     elif request.method == "DELETE":
         # Check whether the boat and the load both exist
