@@ -681,12 +681,109 @@ def specific_load(load_id):
         for load_id in boat["loads"]:
             if load_id == load.key.id:
                 boat["loads"].remove(load_id)
-                
+
         client.put(boat)
 
         # Delete the load
         client.delete(load_key)
 
+        return ("", 204)
+
+@app.route('/boats/<boat_id>/loads/<load_id>')
+def boats_loads(boat_id, load_id):
+    if request.method == "PUT":
+        boat_key = client.key(BOATS, int(boat_id))
+        load_key = client.key(LOADS, int(load_id))
+        boat = client.get(key=boat_key)
+        load = client.get(key=load_key)
+        
+        # If the load has already been assigned to another boat
+        if load["carrier"] is not None:
+            res_body = {"Error": "The load is already loaded on another boat"}
+            return (jsonify(res_body), 403)
+        # Add the load to the boat's loads only if the boat does not have that load
+        does_boat_have_load = False
+        current_loads = boat["loads"]
+        for load_obj in current_loads:
+            if load_obj["id"] == load.key.id:
+                does_boat_have_load = True
+        if not does_boat_have_load:
+            new_load_obj = {
+                "id": load.key.id,
+                "self": request.host_url + "loads/{}".format(load.key.id)
+            }
+            current_loads.append(new_load_obj)
+        boat.update(
+            {
+                "name": boat["name"],
+                "type": boat["type"],
+                "length": boat["length"],
+                "loads": current_loads
+            }
+        )
+        client.put(boat)
+        # Update the carrier on the load
+        carrier_obj = {
+            "id": boat.key.id,
+            "self": request.host_url + "boats/{}".format(boat.key.id)
+        }
+        load.update(
+            {
+                "volume": load["volume"],
+                "item": load["item"],
+                "creation_date": load["creation_date"],
+                "carrier": carrier_obj
+            }
+        )
+        client.put(load)
+        return ("", 204)
+
+    elif request.method == "DELETE":
+        # Check whether the boat and the load both exist
+        boat_key = client.key(BOATS, int(boat_id))
+        load_key = client.key(LOADS, int(load_id))
+        boat = client.get(key=boat_key)
+        load = client.get(key=load_key)
+        # If either the boat or the load does not exist
+        if boat is None or load is None:
+            print("Either the boat or the load does not exist.")
+            res_body = {"Error": "No boat with this boat_id is loaded with the load with this load_id"}
+            return (jsonify(res_body), 404)
+        # If the boat does not have the load
+        does_boat_have_load = False
+        target_load = None
+        for load_obj in boat["loads"]:
+            print("load_obj['id'] = {}".format(load_obj['id']))
+            print("load.key.id = {}".format(load.key.id))
+            if load_obj["id"] == load.key.id:
+                print("The two are equal.")
+                does_boat_have_load = True
+                target_load = load_obj
+        if not does_boat_have_load:
+            print("The boat does not have the load.")
+            res_body = {"Error": "No boat with this boat_id is loaded with the load with this load_id"}
+            return (jsonify(res_body), 404)
+        # Otherwise remove the load from the boat
+        boat["loads"].remove(target_load)
+        boat.update(
+            {
+                "name": boat["name"],
+                "type": boat["type"],
+                "length": boat["length"],
+                "loads": boat["loads"]
+            }
+        )
+        client.put(boat)
+        # Reset the carrier of the load
+        load.update(
+            {
+                "volume": load["volume"],
+                "item": load["item"],
+                "creation_date": load["creation_date"],
+                "carrier": None
+            }
+        )
+        client.put(load)
         return ("", 204)
 
 # Generate a JWT from the Auth0 domain and return it
