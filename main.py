@@ -681,9 +681,16 @@ def specific_load(load_id):
 
         return ("", 204)
 
-@app.route('/boats/<boat_id>/loads/<load_id>', methods=['PUT'])
+@app.route('/boats/<boat_id>/loads/<load_id>', methods=['PUT', 'DELETE'])
 def boats_loads(boat_id, load_id):
     if request.method == "PUT":
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+
         boat_key = client.key(BOATS, int(boat_id))
         load_key = client.key(LOADS, int(load_id))
         boat = client.get(key=boat_key)
