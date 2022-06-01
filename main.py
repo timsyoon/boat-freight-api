@@ -721,52 +721,36 @@ def boats_loads(boat_id, load_id):
             return jsonify({}), 204
 
     elif request.method == "DELETE":
-        # Check whether the boat and the load both exist
         boat_key = client.key(BOATS, int(boat_id))
         load_key = client.key(LOADS, int(load_id))
         boat = client.get(key=boat_key)
         load = client.get(key=load_key)
-        # If either the boat or the load does not exist
+
+        # Check whether both the boat and load exist
         if boat is None or load is None:
-            print("Either the boat or the load does not exist.")
-            res_body = {"Error": "No boat with this boat_id is loaded with the load with this load_id"}
-            return (jsonify(res_body), 404)
+            res_body = { "Error": "The specified boat and/or load does not exist" }
+            return jsonify(res_body), 404
+
         # If the boat does not have the load
         does_boat_have_load = False
         target_load = None
         for load_obj in boat["loads"]:
-            print("load_obj['id'] = {}".format(load_obj['id']))
-            print("load.key.id = {}".format(load.key.id))
             if load_obj["id"] == load.key.id:
-                print("The two are equal.")
                 does_boat_have_load = True
                 target_load = load_obj
         if not does_boat_have_load:
-            print("The boat does not have the load.")
-            res_body = {"Error": "No boat with this boat_id is loaded with the load with this load_id"}
-            return (jsonify(res_body), 404)
-        # Otherwise remove the load from the boat
+            res_body = { "Error": "No boat with this boat_id is loaded with the load with this load_id" }
+            return jsonify(res_body), 404
+
+        # Remove the load from the boat
         boat["loads"].remove(target_load)
-        boat.update(
-            {
-                "name": boat["name"],
-                "type": boat["type"],
-                "length": boat["length"],
-                "loads": boat["loads"]
-            }
-        )
         client.put(boat)
+
         # Reset the carrier of the load
-        load.update(
-            {
-                "volume": load["volume"],
-                "item": load["item"],
-                "creation_date": load["creation_date"],
-                "carrier": None
-            }
-        )
+        load["carrier"] = None
         client.put(load)
-        return ("", 204)
+
+        return jsonify({}), 204
 
 # Generate a JWT from the Auth0 domain and return it
 # Request: JSON body with 2 properties with "username" and "password"
