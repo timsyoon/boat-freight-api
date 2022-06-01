@@ -595,7 +595,7 @@ def loads():
 
         return jsonify(output), 200
 
-@app.route('/loads/<load_id>', methods=['GET', 'PATCH', 'PUT'])
+@app.route('/loads/<load_id>', methods=['GET', 'PATCH', 'PUT', 'DELETE'])
 def specific_load(load_id):
     if request.method == "GET":
         # If the request does not have an Accept header or the Accept header does not include 'application/json'
@@ -657,6 +657,37 @@ def specific_load(load_id):
         load["self"] = request.base_url
 
         return jsonify(load), 200
+    
+    elif request.method == "DELETE":
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+
+        load_key = client.key(LOADS, int(load_id))
+        load = client.get(key=load_key)
+
+        # If the load does not have a carrier, simply delete the load
+        if load["carrier"] is None:
+            client.delete(load_key)
+            return ("", 204)
+
+        # Update the boat carrying the load
+        boat_id = load["carrier"]
+        boat_key = client.key(BOATS, int(boat_id))
+        boat = client.get(key=boat_key)
+        for load_id in boat["loads"]:
+            if load_id == load.key.id:
+                boat["loads"].remove(load_id)
+                
+        client.put(boat)
+
+        # Delete the load
+        client.delete(load_key)
+
+        return ("", 204)
 
 # Generate a JWT from the Auth0 domain and return it
 # Request: JSON body with 2 properties with "username" and "password"
