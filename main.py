@@ -595,6 +595,23 @@ def loads():
 
         return jsonify(output), 200
 
+@app.route('/loads/<load_id>', methods=['GET'])
+def specific_load(load_id):
+    if request.method == "GET":
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+        
+        load_key = client.key(LOADS, int(load_id))
+        load = client.get(key=load_key)
+        load["id"] = load.key.id
+        load["self"] = request.base_url
+
+        return jsonify(load), 200
+
 # Generate a JWT from the Auth0 domain and return it
 # Request: JSON body with 2 properties with "username" and "password"
 #       of a user registered with this Auth0 domain
