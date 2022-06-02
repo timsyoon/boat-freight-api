@@ -195,7 +195,7 @@ def users():
         results = list(query.fetch())
         return jsonify(results), 200
 
-@app.route('/boats', methods=['POST', 'GET', 'DELETE'])
+@app.route('/boats', methods=['POST', 'GET'])
 def boats():
     if request.method == 'POST':
         content = request.get_json()
@@ -321,9 +321,8 @@ def boats():
 
             return jsonify(output), 200
 
-    elif request.method == 'DELETE':
-        res_body = { 'Error': 'Method not recognized' }
-        return jsonify(res_body), 405
+    else:
+        return jsonify(error='Method not recognized')
 
 @app.route('/boats/<boat_id>', methods=['GET', 'PATCH', 'PUT', 'DELETE'])
 def specific_boat(boat_id):
@@ -542,7 +541,7 @@ def specific_boat(boat_id):
 
             return jsonify({}), 204
 
-@app.route('/loads', methods=['POST', 'GET'])
+@app.route('/loads', methods=['POST', 'GET', 'DELETE'])
 def loads():
     if request.method == "POST":
         content = request.get_json()
@@ -617,6 +616,10 @@ def loads():
         output["total_number_of_loads"] = total_number_of_loads
 
         return jsonify(output), 200
+
+    elif request.method == 'DELETE':
+        res_body = { 'Error': 'Method not supported' }
+        return jsonify(res_body), 405
 
 @app.route('/loads/<load_id>', methods=['GET', 'PATCH', 'PUT', 'DELETE'])
 def specific_load(load_id):
