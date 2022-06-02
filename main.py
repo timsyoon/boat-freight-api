@@ -701,13 +701,16 @@ def boats_loads(boat_id, load_id):
             res_body = { "Error": "The specified boat and/or load does not exist" }
             return jsonify(res_body), 404
 
+        # If the load has already been assigned to another boat
+        if load["carrier"] is not None:
+            res_body = { "Error": "The load is already loaded on another boat" }
+            return jsonify(res_body), 403
+
         # Add the load to the boat's loads only if the boat does not have that load
         does_boat_have_load = False
-        
         for load_obj in boat["loads"]:
             if load_obj["id"] == load.key.id:
                 does_boat_have_load = True
-        
         if not does_boat_have_load:
             # Update the boat
             new_load_obj = {
@@ -734,7 +737,7 @@ def boats_loads(boat_id, load_id):
                 'Error': 'The request object does not have an Accept header that includes \'application/json\''
             }
             return jsonify(res_body), 406
-            
+
         boat_key = client.key(BOATS, int(boat_id))
         load_key = client.key(LOADS, int(load_id))
         boat = client.get(key=boat_key)
