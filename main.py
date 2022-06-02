@@ -500,6 +500,11 @@ def specific_boat(boat_id):
             boat_key = client.key(BOATS, int(boat_id))
             boat = client.get(key=boat_key)
 
+            # If the boat does not exist
+            if boat is None:
+                res_body = { "Error": "No boat with this boat_id exists" }
+                return jsonify(res_body), 404
+
             # If the boat is owned by someone else, return 403 status code
             if boat['owner'] != jwt_sub:
                 res_body = {
@@ -507,9 +512,27 @@ def specific_boat(boat_id):
                 }
                 return jsonify(res_body), 403
             
+            # Update the loads that are on the boat
+            for load_obj in boat["loads"]:
+                load_key = client.key(LOADS, load_obj["id"])
+                load = client.get(key=load_key)
+                load["carrier"] = None
+                client.put(load)
+
+            # Update the user that owns this boat
+            query = client.query(kind=USERS)
+            query.add_filter("user_id", "=", jwt_sub)
+            results = list(query.fetch())
+            for user in results:
+                for boat_obj in user["boats"]:
+                    if boat_obj["id"] == boat.key.id:
+                        user["boats"].remove(boat_obj)
+                        client.put(user)
+
+            # Delete the boat
             client.delete(boat_key)
-            res_body = {}
-            return jsonify(res_body), 204
+
+            return jsonify({}), 204
 
 @app.route('/loads', methods=['POST', 'GET'])
 def loads():
