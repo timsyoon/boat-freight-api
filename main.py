@@ -618,7 +618,7 @@ def loads():
         return jsonify(output), 200
 
     elif request.method == 'DELETE':
-        return jsonify({}), 405
+        return "", 405
 
 @app.route('/loads/<load_id>', methods=['GET', 'PATCH', 'PUT', 'DELETE'])
 def specific_load(load_id):
