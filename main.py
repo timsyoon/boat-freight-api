@@ -479,6 +479,13 @@ def specific_boat(boat_id):
             return jsonify(res_body), 200
 
     elif request.method == 'DELETE':
+        # If the request does not have an Accept header or the Accept header does not include 'application/json'
+        if 'Accept' not in request.headers or request.headers['Accept'] != 'application/json':
+            res_body = {
+                'Error': 'The request object does not have an Accept header that includes \'application/json\''
+            }
+            return jsonify(res_body), 406
+            
         is_jwt_valid = False
         jwt_sub = None
         try:
