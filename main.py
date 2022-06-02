@@ -195,7 +195,7 @@ def users():
         results = list(query.fetch())
         return jsonify(results), 200
 
-@app.route('/boats', methods=['POST', 'GET'])
+@app.route('/boats', methods=['POST', 'GET', 'DELETE'])
 def boats():
     if request.method == 'POST':
         content = request.get_json()
@@ -321,8 +321,9 @@ def boats():
 
             return jsonify(output), 200
 
-    else:
-        return jsonify(error='Method not recognized')
+    elif request.method == 'DELETE':
+        res_body = { 'Error': 'Method not recognized' }
+        return jsonify(res_body), 405
 
 @app.route('/boats/<boat_id>', methods=['GET', 'PATCH', 'PUT', 'DELETE'])
 def specific_boat(boat_id):
