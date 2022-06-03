@@ -129,7 +129,7 @@ def decode_jwt():
 def home():
     return render_template("home.html")
 
-@app.route('/login', methods=['POST'])
+@app.route('/login')
 def login():
     return oauth.auth0.authorize_redirect(
         redirect_uri=url_for("callback", _external=True)
