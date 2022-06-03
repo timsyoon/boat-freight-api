@@ -21,7 +21,7 @@ ALGORITHMS = ["RS256"]
 BOATS = 'boats'
 LOADS = 'loads'
 USERS = 'users'
-APP_URL = 'http://localhost:8080'
+APP_URL = 'https://cs493-final-project-yoonti.wl.r.appspot.com'
 
 app = Flask(__name__)
 app.secret_key = 'SECRET_KEY'
